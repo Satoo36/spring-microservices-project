@@ -1,0 +1,11 @@
+# This file is the DEFAULT config for user-service (all profiles).
+# The config-server will serve this when user-service starts up.
+
+server:
+  port: 8081
+
+# A custom property — we'll use this to demonstrate live config refresh in Step 6.
+# When you change this value and call /actuator/refresh, user-service picks it up without restart.
+app:
+  greeting: "Hello from Config Server! (default profile)"
+  feature-flag: false

@@ -46,7 +46,7 @@ Each phase introduces specific concepts. Complete them in order — each builds 
 
 ---
 
-### Phase 1 — Foundation (Service Discovery & Config)
+### Phase 1 — Foundation (Service Discovery & Config) ✅ COMPLETED
 
 **Goal:** Get services to register, discover, and fetch config dynamically.
 
@@ -57,18 +57,38 @@ Each phase introduces specific concepts. Complete them in order — each builds 
 - Spring profiles (`dev`, `prod`)
 
 **Steps:**
-1. Create parent `pom.xml` with Spring Boot 3.x + Spring Cloud BOM
-2. Build `eureka-server` — `@EnableEurekaServer`, `application.yml`
-3. Build `config-server` — `@EnableConfigServer`, point to a Git/local config repo
-4. Build `user-service` (minimal) — registers with Eureka, fetches config from Config Server
-5. Verify: Eureka dashboard at `http://localhost:8761`, confirm `user-service` appears
-6. Verify: Change a property in config repo, call `/actuator/refresh` on `user-service`
+1. ✅ Create parent `pom.xml` with Spring Boot 3.x + Spring Cloud BOM
+2. ✅ Build `eureka-server` — `@EnableEurekaServer`, `application.yml`
+3. ✅ Build `config-server` — `@EnableConfigServer`, native (local) config repo
+4. ✅ Build `user-service` (minimal) — registers with Eureka, fetches config from Config Server
+5. ✅ Verified: Eureka dashboard at `http://localhost:8761` — `USER-SERVICE` appears
+6. ✅ Verified: Changed property in `config-repo/user-service.yml`, called `POST /actuator/refresh` — value updated without restart
+
+**What was built:**
+```
+config-repo/
+├── user-service.yml          ← default config (port 8081, app.greeting, app.feature-flag)
+└── user-service-dev.yml      ← dev profile overrides (feature-flag=true)
+
+eureka-server/                port 8761
+config-server/                port 8888  (native backend → config-repo/)
+user-service/                 port 8081
+  └── GreetingController      GET /api/users/greeting  — reads app.greeting via @Value + @RefreshScope
+```
+
+**Key implementation notes:**
+- Java 17 used (not 21) — match to your installed JDK
+- Config Server uses `spring.profiles.active=native` to read from local filesystem
+- `user-service` connects to Config Server via `spring.config.import=optional:configserver:http://localhost:8888`
+- `@RefreshScope` on controller + `POST /actuator/refresh` = live config reload without restart
+- Start order matters: **Eureka → Config Server → user-service**
 
 **Key interview questions this covers:**
 - What is service discovery and why do we need it?
 - How does a service register with Eureka?
 - What is the difference between client-side and server-side discovery?
 - How does Spring Cloud Config Server work?
+- What is `@RefreshScope` and how does live config refresh work?
 
 ---
 

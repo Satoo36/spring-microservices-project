@@ -1,0 +1,6 @@
+# This file is served when user-service starts with --spring.profiles.active=dev
+# It OVERRIDES (merges on top of) user-service.yml — only the keys you redefine here change.
+
+app:
+  greeting: "Hello from Config Server! (DEV profile)"
+  feature-flag: true

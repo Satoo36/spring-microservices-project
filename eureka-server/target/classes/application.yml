@@ -1,0 +1,23 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: eureka-server
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    # The Eureka server should NOT register itself as a client.
+    # By default every Eureka-enabled app tries to register — we turn that off here
+    # because this IS the registry, not a service that needs to be found.
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      # The URL where clients will reach this server
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # During startup, Eureka waits before marking services as available.
+    # Set to 0 for local dev so we don't wait 5 minutes.
+    wait-time-in-ms-when-sync-empty: 0
