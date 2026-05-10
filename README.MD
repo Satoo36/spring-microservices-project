@@ -92,7 +92,7 @@ user-service/                 port 8081
 
 ---
 
-### Phase 2 — API Gateway & Routing
+### Phase 2 — API Gateway & Routing ✅ COMPLETED
 
 **Goal:** All external traffic enters through one gateway; services remain unreachable directly.
 
@@ -103,18 +103,40 @@ user-service/                 port 8081
 - Rate limiting
 
 **Steps:**
-1. Build `api-gateway` — Spring Cloud Gateway + Eureka client
-2. Configure routes in `application.yml` using `lb://user-service` URIs
-3. Add a global pre-filter to log request method + path
-4. Add a post-filter to log response status
-5. Add rate limiting using Redis + `RequestRateLimiter` filter
-6. Test: All requests go through `localhost:8080/api/users/**`
+1. ✅ Build `api-gateway` — Spring Cloud Gateway + Eureka client
+2. ✅ Configure routes in `application.yml` using `lb://user-service` URIs
+3. ✅ Add a global pre-filter to log request method + path
+4. ✅ Add a post-filter to log response status
+5. ✅ Add rate limiting using Redis + `RequestRateLimiter` filter
+6. ✅ Test: All requests go through `localhost:8080/api/users/**`
+
+**What was built:**
+```
+api-gateway/                        port 8080
+  ├── ApiGatewayApplication.java    @SpringBootApplication (WebFlux/Netty, NOT Tomcat)
+  ├── filter/
+  │   └── LoggingFilter.java        GlobalFilter — pre-logs method+path, post-logs status
+  └── config/
+      └── RateLimiterConfig.java    RedisRateLimiter(10 req/s, burst 20) + IP KeyResolver
+```
+
+**Key implementation notes:**
+- Spring Cloud Gateway is WebFlux-based — do NOT add `spring-boot-starter-web` (conflict)
+- `lb://user-service` = Eureka lookup + Round Robin client-side load balancing
+- `GlobalFilter` = applied to ALL routes automatically; `GatewayFilter` = per-route only
+- Pre-filter: code before `chain.filter(exchange)`; Post-filter: `.then(Mono.fromRunnable(...))`
+- Rate limiting uses token bucket via Redis — start Redis first: `docker run -d -p 6379:6379 redis:alpine`
+- `key-resolver: "#{@ipKeyResolver}"` — SpEL expression wiring the KeyResolver bean to the route
+- Start order: **Eureka → Config Server → user-service → Redis → api-gateway**
+- Inspect live routes: `GET http://localhost:8080/actuator/gateway/routes`
 
 **Key interview questions this covers:**
 - What does an API Gateway do?
 - What is the difference between `Zuul` and `Spring Cloud Gateway`?
 - How do you implement rate limiting in a gateway?
 - What is a filter chain in the context of a gateway?
+
+**Answers to interview questions are in:** `api-gateway/src/main/java/com/microservices/gateway/ApiGatewayApplication.java`
 
 ---
 

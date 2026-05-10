@@ -1,0 +1,117 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  # ============================================================
+  # REDIS — required for the RequestRateLimiter filter.
+  # Start before launching gateway:
+  #   docker run -d -p 6379:6379 redis:alpine
+  # ============================================================
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # connect-timeout: 2000  # uncomment to fail fast if Redis is down
+
+  # ============================================================
+  # SPRING CLOUD GATEWAY — Routes
+  # ============================================================
+  cloud:
+    gateway:
+
+      # discovery.locator.enabled=true would AUTO-CREATE routes for every
+      # Eureka-registered service using the service name as path prefix.
+      # e.g., /USER-SERVICE/** → user-service (uppercase, less clean).
+      # We disable it and define routes manually for full control.
+      discovery:
+        locator:
+          enabled: false
+
+      routes:
+
+        # ----------------------------------------------------------
+        # ROUTE: user-service
+        # ----------------------------------------------------------
+        # id         : unique name for this route (used in logs/actuator)
+        # uri        : lb://user-service
+        #              "lb://" tells the gateway to use Eureka + LoadBalancer.
+        #              Gateway asks Eureka for instances of "user-service",
+        #              then picks one using Round Robin load balancing.
+        # predicates : conditions that must be true to match this route.
+        #              Path=/api/users/** matches any request starting with that path.
+        # filters    : transformations applied to matched requests/responses.
+        # ----------------------------------------------------------
+        - id: user-service-route
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            # RequestRateLimiter: applies token-bucket rate limiting via Redis.
+            # replenishRate  = tokens added per second (steady throughput)
+            # burstCapacity  = max tokens in bucket (allows bursts)
+            # requestedTokens= tokens consumed per request
+            # key-resolver   = SpEL expression pointing to the KeyResolver bean
+            #                  #{@beanName} is Spring Expression Language syntax
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
+        # ----------------------------------------------------------
+        # ROUTE TEMPLATE (commented — add more services here later)
+        # ----------------------------------------------------------
+        # - id: order-service-route
+        #   uri: lb://order-service
+        #   predicates:
+        #     - Path=/api/orders/**
+        #   filters:
+        #     - name: RequestRateLimiter
+        #       args:
+        #         redis-rate-limiter.replenishRate: 5
+        #         redis-rate-limiter.burstCapacity: 10
+        #         redis-rate-limiter.requestedTokens: 1
+        #         key-resolver: "#{@ipKeyResolver}"
+
+# ============================================================
+# EUREKA CLIENT
+# - fetch-registry: true  → gateway downloads service list so lb:// works
+# - register-with-eureka: true → gateway itself appears in Eureka dashboard
+# ============================================================
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+
+# ============================================================
+# ACTUATOR ENDPOINTS
+# GET /actuator/gateway/routes  → see all active routes at runtime
+# GET /actuator/gateway/filters → see all registered filters
+# GET /actuator/health          → gateway health status
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway
+  endpoint:
+    gateway:
+      enabled: true
+
+# ============================================================
+# LOGGING
+# Set to DEBUG during development to see route matching decisions.
+# Drop to INFO in production.
+# ============================================================
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.microservices.gateway: DEBUG

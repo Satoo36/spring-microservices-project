@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        IMPORTANT: Spring Cloud Gateway is WebFlux-based (reactive / non-blocking).
+        Do NOT add spring-boot-starter-web — it conflicts with WebFlux.
+        Gateway uses Netty as the embedded server, not Tomcat.
+    -->
+    <parent>
+        <groupId>com.microservices</groupId>
+        <artifactId>microservices-project</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>api-gateway</artifactId>
+
+    <dependencies>
+
+        <!--
+            Spring Cloud Gateway (WebFlux-based reactive gateway).
+            Replaces the older Zuul 1.x (servlet/blocking) gateway.
+            Uses Netty server + Project Reactor for non-blocking routing.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+
+        <!--
+            Eureka client — gateway registers itself AND discovers downstream services.
+            Enables lb://service-name URIs in route config (client-side load balancing).
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+
+        <!--
+            Actuator — exposes /actuator/gateway/routes and /actuator/gateway/filters
+            so you can inspect the live routing table at runtime.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!--
+            Redis reactive client — required for RequestRateLimiter filter.
+            Uses Lettuce (non-blocking Redis client) under the hood.
+            Start Redis: docker run -d -p 6379:6379 redis:alpine
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
+
+    </dependencies>
+
+</project>

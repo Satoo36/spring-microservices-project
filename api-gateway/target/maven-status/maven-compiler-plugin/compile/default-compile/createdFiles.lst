@@ -1,0 +1,3 @@
+com\microservices\gateway\filter\LoggingFilter.class
+com\microservices\gateway\config\RateLimiterConfig.class
+com\microservices\gateway\ApiGatewayApplication.class
