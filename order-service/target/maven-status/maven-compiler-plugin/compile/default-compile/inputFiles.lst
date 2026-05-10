@@ -7,4 +7,7 @@ D:\excersices\spring-microservices-project\order-service\src\main\java\com\micro
 D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\model\CreateOrderRequest.java
 D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\model\Order.java
 D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\OrderServiceApplication.java
+D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\resilience\ProductServiceGateway.java
+D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\resilience\ServiceUnavailableException.java
+D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\resilience\UserServiceGateway.java
 D:\excersices\spring-microservices-project\order-service\src\main\java\com\microservices\order\service\OrderService.java

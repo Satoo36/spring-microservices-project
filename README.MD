@@ -197,7 +197,7 @@ order-service/                port 8082
 
 ---
 
-### Phase 4 — Resilience (Circuit Breaker & Retry)
+### Phase 4 — Resilience (Circuit Breaker & Retry) ✅ COMPLETED
 
 **Goal:** Services degrade gracefully when downstream services are unavailable.
 
@@ -208,19 +208,54 @@ order-service/                port 8082
 - Fallback methods
 
 **Steps:**
-1. Add `resilience4j` to `order-service`
-2. Annotate the `product-service` Feign call with `@CircuitBreaker(name="productService", fallbackMethod="fallback")`
-3. Write the fallback method returning a default/cached response
-4. Configure thresholds in `application.yml` (failure rate, wait duration, slow call threshold)
-5. Add `@Retry` on a flaky operation
-6. Test: Shut down `product-service`, watch circuit open; restart it, watch circuit close
-7. Expose circuit breaker metrics via `/actuator/health`
+1. ✅ Add `resilience4j` + `spring-boot-starter-aop` to `order-service`
+2. ✅ `@CircuitBreaker` + `@Retry` on product-service calls; `@Retry` on user-service calls
+3. ✅ Fallback methods that propagate business errors and throw `ServiceUnavailableException` for infra failures
+4. ✅ Full threshold config in `application.yml` (failure rate, window size, wait duration, slow-call threshold)
+5. ✅ `@Bulkhead(SEMAPHORE)` on `reduceStock` — caps concurrent calls
+6. ✅ Test: shut down `product-service` → watch circuit open; restart → watch circuit close
+7. ✅ `GET /actuator/health` shows `CLOSED`/`OPEN`/`HALF_OPEN` per circuit breaker
+
+**What was built:**
+```
+order-service/resilience/
+  ServiceUnavailableException.java  @ResponseStatus(503) — thrown by all fallbacks
+  ProductServiceGateway.java        @CircuitBreaker + @Retry on getProduct()
+                                    @CircuitBreaker + @Bulkhead on reduceStock()
+                                    fallback methods for each
+  UserServiceGateway.java           @Retry(maxAttempts=3) on getUser()
+                                    fallback propagates business errors as-is
+```
+
+**Key implementation notes:**
+- AOP self-invocation problem: `@CircuitBreaker` only works when called through the Spring proxy.
+  Putting annotations in a separate `@Service` class (Gateway) solves this.
+- Stacking order: `@Bulkhead` → `@CircuitBreaker` → `@Retry` → actual Feign call (outer to inner)
+- `ignore-exceptions: [IllegalArgumentException]` — business errors (404, bad stock) don't trip the circuit
+- Fallback method signature: **same params as original + `Throwable` at end** (must match exactly)
+- `sliding-window-size: 10` + `minimum-number-of-calls: 5` — circuit won't open on the very first failure
+- `automatic-transition-from-open-to-half-open-enabled: true` — no manual intervention needed
+- Check CB state: `GET http://localhost:8082/actuator/health`
+- Check CB metrics: `GET http://localhost:8082/actuator/metrics/resilience4j.circuitbreaker.state`
+
+**Test procedure:**
+```bash
+# 1. Confirm normal operation
+POST http://localhost:8082/api/orders  { "userId":"u1","productId":"p1","quantity":1 }
+
+# 2. Stop product-service — send 5+ requests → watch circuit OPEN in logs
+# 3. All requests now get 503 immediately (no Feign call made)
+# 4. Restart product-service — wait 10s → circuit moves to HALF-OPEN → then CLOSED
+# 5. GET /actuator/health to see CB state at any point
+```
 
 **Key interview questions this covers:**
 - What is the Circuit Breaker pattern? What are its states?
 - What is the difference between a retry and a circuit breaker?
 - What is the Bulkhead pattern?
 - How do you configure Resilience4j in Spring Boot?
+
+**Answers to interview questions are in:** `order-service/src/main/java/com/microservices/order/OrderServiceApplication.java`
 
 ---
 

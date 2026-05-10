@@ -39,6 +39,28 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+
+        <!--
+            Resilience4j — Circuit Breaker, Retry, Bulkhead, Rate Limiter.
+            spring-cloud-starter-circuitbreaker-resilience4j pulls in:
+              - resilience4j-spring-boot3  (annotation support: @CircuitBreaker, @Retry, @Bulkhead)
+              - resilience4j-reactor       (reactive support, not used here)
+            Version is managed by Spring Cloud BOM — no explicit version needed.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+        </dependency>
+
+        <!--
+            AOP support — REQUIRED for @CircuitBreaker, @Retry, @Bulkhead annotations.
+            Resilience4j uses Spring AOP to intercept method calls and apply resilience logic.
+            Without this, the annotations are silently ignored (no error, no protection).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

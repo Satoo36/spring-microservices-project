@@ -1,10 +1,13 @@
-com\microservices\order\OrderServiceApplication.class
-com\microservices\order\service\OrderService.class
 com\microservices\order\client\UserServiceClient.class
 com\microservices\order\controller\OrderController.class
 com\microservices\order\client\dto\UserResponse.class
-com\microservices\order\model\CreateOrderRequest.class
 com\microservices\order\client\ProductServiceClient.class
+com\microservices\order\resilience\UserServiceGateway.class
+com\microservices\order\OrderServiceApplication.class
+com\microservices\order\service\OrderService.class
+com\microservices\order\model\CreateOrderRequest.class
 com\microservices\order\model\Order.class
 com\microservices\order\interceptor\FeignClientInterceptor.class
+com\microservices\order\resilience\ServiceUnavailableException.class
+com\microservices\order\resilience\ProductServiceGateway.class
 com\microservices\order\client\dto\ProductResponse.class

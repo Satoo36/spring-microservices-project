@@ -7,6 +7,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 /*
  * ================================================================
  * PHASE 3 — INTER-SERVICE COMMUNICATION (Feign + LoadBalancer)
+ * PHASE 4 — RESILIENCE (Circuit Breaker, Retry, Bulkhead)
  * ================================================================
  *
  * WHAT IS A FEIGN CLIENT?
@@ -92,6 +93,59 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
  *     (3) Latency multiplication — total time = sum of all downstream call times.
  *     (4) Thread exhaustion — blocked threads reduce throughput under load.
  *     Circuit Breaker (Phase 4) and async messaging via Kafka (Phase 5) mitigate these.
+ * ================================================================
+ *
+ * ================================================================
+ * PHASE 4 — RESILIENCE INTERVIEW Q&A
+ * ================================================================
+ *
+ * Q1: What is the Circuit Breaker pattern? What are its states?
+ * A:  Monitors calls to a downstream service. If the failure rate exceeds a
+ *     threshold, the circuit "trips" and subsequent calls immediately go to a
+ *     fallback — no actual call is made. This gives the failing service time to
+ *     recover without being hammered with traffic.
+ *
+ *     Three states:
+ *       CLOSED    → normal operation; all calls go through; failures are counted.
+ *       OPEN      → circuit tripped; all calls short-circuit to fallback immediately.
+ *                   Saves resources and lets the downstream service recover.
+ *       HALF-OPEN → after a wait duration, a small number of test calls are allowed.
+ *                   If they succeed → circuit closes (recovered).
+ *                   If they fail   → circuit opens again (still broken).
+ *
+ * Q2: What is the difference between a Retry and a Circuit Breaker?
+ * A:  Retry:          re-attempts the SAME call after a failure. Handles transient
+ *                     (temporary) failures — network blips, short restart windows.
+ *                     Risk: if service is fully down, retries waste resources and
+ *                     add latency for every request.
+ *     Circuit Breaker: stops calling the failing service entirely once the failure
+ *                     rate crosses the threshold. Short-circuits immediately while
+ *                     OPEN — saves threads, reduces load on the broken service.
+ *
+ *     Best practice: stack them — Retry (inner) inside CircuitBreaker (outer).
+ *       CB sees retries as one logical attempt → fair failure rate calculation.
+ *
+ * Q3: What is the Bulkhead pattern?
+ * A:  Isolates a resource (threads or concurrent calls) for each downstream dependency.
+ *     If product-service is slow and consuming all available threads, the Bulkhead
+ *     caps the number of concurrent calls to it. Other services (user-service, etc.)
+ *     are unaffected — they have their own "compartment" of threads.
+ *
+ *     Analogy: a ship's bulkhead separates compartments. If one floods, others stay dry.
+ *
+ *     Two types in Resilience4j:
+ *       SEMAPHORE   → limits concurrent calls (same thread); lightweight
+ *       THREADPOOL  → uses a dedicated thread pool; full thread isolation
+ *
+ * Q4: How do you configure Resilience4j in Spring Boot?
+ * A:  Add spring-cloud-starter-circuitbreaker-resilience4j + spring-boot-starter-aop.
+ *     Annotate methods: @CircuitBreaker(name="x", fallbackMethod="y"), @Retry, @Bulkhead.
+ *     Configure thresholds in application.yml under resilience4j.circuitbreaker.instances.x.
+ *     Expose via actuator: management.health.circuitbreakers.enabled=true.
+ *     Check health: GET /actuator/health → shows each CB state (CLOSED/OPEN/HALF_OPEN).
+ *
+ *     IMPORTANT: annotations use Spring AOP — the annotated method must be called
+ *     through the Spring proxy (from a different bean), not via self-invocation.
  * ================================================================
  *
  * @EnableFeignClients — scans this package (and sub-packages) for @FeignClient

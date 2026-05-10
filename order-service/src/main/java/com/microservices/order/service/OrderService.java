@@ -1,15 +1,13 @@
 package com.microservices.order.service;
 
-import com.microservices.order.client.ProductServiceClient;
-import com.microservices.order.client.UserServiceClient;
 import com.microservices.order.client.dto.ProductResponse;
 import com.microservices.order.client.dto.UserResponse;
 import com.microservices.order.model.CreateOrderRequest;
 import com.microservices.order.model.Order;
-import feign.FeignException;
+import com.microservices.order.resilience.ProductServiceGateway;
+import com.microservices.order.resilience.UserServiceGateway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -18,69 +16,49 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /*
- * OrderService — orchestrates two Feign calls to create an order:
+ * OrderService — Phase 4 update.
  *
- *   1. Validate user exists   → calls user-service   via UserServiceClient
- *   2. Fetch product + stock  → calls product-service via ProductServiceClient
- *   3. Reduce stock           → calls product-service via ProductServiceClient
- *   4. Persist order          → stores in ConcurrentHashMap (DB in Phase 8)
+ * Now uses ProductServiceGateway and UserServiceGateway instead of raw Feign clients.
+ * OrderService knows nothing about resilience — it just calls the gateways.
+ * Resilience is handled transparently by @CircuitBreaker / @Retry AOP proxies.
  *
- * CALL FLOW:
- *   client → gateway → order-service → user-service    (Feign, sync)
- *                                    → product-service  (Feign, sync, twice)
+ * CALL CHAIN (Phase 4):
+ *   client → gateway → order-service → UserServiceGateway    (@Retry) → user-service
+ *                                    → ProductServiceGateway (@CB + @Retry + @Bulkhead) → product-service
  *
- * This is SYNCHRONOUS ORCHESTRATION — order-service blocks on every Feign call.
- * Phase 4 adds Circuit Breaker so a down product-service doesn't crash order-service.
- * Phase 5 replaces the stock-reduction call with an async Kafka event.
+ * If product-service is DOWN:
+ *   First N calls  → @Retry retries N times, then @CircuitBreaker records failures
+ *   After threshold → Circuit OPENS → all calls immediately go to fallback (ServiceUnavailableException)
+ *   After wait time → Circuit HALF-OPENS → test calls allowed through
+ *   If test calls succeed → Circuit CLOSES → normal operation resumes
  */
 @Service
 public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
-    private final UserServiceClient    userServiceClient;
-    private final ProductServiceClient productServiceClient;
+    private final UserServiceGateway    userServiceGateway;
+    private final ProductServiceGateway productServiceGateway;
 
     // In-memory store — replaced by JPA repository in Phase 8
     private final Map<String, Order> orders = new ConcurrentHashMap<>();
 
-    public OrderService(UserServiceClient userServiceClient,
-                        ProductServiceClient productServiceClient) {
-        this.userServiceClient    = userServiceClient;
-        this.productServiceClient = productServiceClient;
+    public OrderService(UserServiceGateway userServiceGateway,
+                        ProductServiceGateway productServiceGateway) {
+        this.userServiceGateway    = userServiceGateway;
+        this.productServiceGateway = productServiceGateway;
     }
 
     public Order createOrder(CreateOrderRequest request) {
         log.info("Creating order: userId={}, productId={}, quantity={}",
                 request.getUserId(), request.getProductId(), request.getQuantity());
 
-        // ── Step 1: Validate user ──────────────────────────────────────────────
-        // Feign call → GET http://user-service/api/users/{id}
-        // FeignException.NotFound is thrown if user-service returns 404
-        UserResponse user;
-        try {
-            ResponseEntity<UserResponse> userResponse =
-                    userServiceClient.getUserById(request.getUserId());
-            user = userResponse.getBody();
-        } catch (FeignException.NotFound e) {
-            throw new IllegalArgumentException("User not found: " + request.getUserId());
-        } catch (FeignException e) {
-            throw new RuntimeException("Failed to reach user-service: " + e.getMessage(), e);
-        }
+        // Step 1: Validate user — @Retry handles transient failures automatically
+        UserResponse user = userServiceGateway.getUser(request.getUserId());
         log.info("User validated: {}", user.getName());
 
-        // ── Step 2: Fetch product details (price + stock check) ────────────────
-        // Feign call → GET http://product-service/api/products/{id}
-        ProductResponse product;
-        try {
-            ResponseEntity<ProductResponse> productResponse =
-                    productServiceClient.getProductById(request.getProductId());
-            product = productResponse.getBody();
-        } catch (FeignException.NotFound e) {
-            throw new IllegalArgumentException("Product not found: " + request.getProductId());
-        } catch (FeignException e) {
-            throw new RuntimeException("Failed to reach product-service: " + e.getMessage(), e);
-        }
+        // Step 2: Fetch product — @CircuitBreaker + @Retry handles failures
+        ProductResponse product = productServiceGateway.getProduct(request.getProductId());
 
         if (product.getStock() < request.getQuantity()) {
             throw new IllegalArgumentException(
@@ -90,15 +68,10 @@ public class OrderService {
         log.info("Product validated: {} | price={} | stock={}",
                 product.getName(), product.getPrice(), product.getStock());
 
-        // ── Step 3: Reduce stock ───────────────────────────────────────────────
-        // Feign call → PUT http://product-service/api/products/{id}/reduce-stock?quantity=N
-        try {
-            productServiceClient.reduceStock(request.getProductId(), request.getQuantity());
-        } catch (FeignException e) {
-            throw new RuntimeException("Failed to reduce stock: " + e.getMessage(), e);
-        }
+        // Step 3: Reduce stock — @CircuitBreaker + @Bulkhead handles failures
+        productServiceGateway.reduceStock(request.getProductId(), request.getQuantity());
 
-        // ── Step 4: Persist order ──────────────────────────────────────────────
+        // Step 4: Save order
         double totalPrice = product.getPrice() * request.getQuantity();
         Order order = new Order(
                 UUID.randomUUID().toString(),
