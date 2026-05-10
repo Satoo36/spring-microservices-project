@@ -27,6 +27,8 @@
         <module>config-server</module>
         <module>user-service</module>
         <module>api-gateway</module>
+        <module>order-service</module>
+        <module>product-service</module>
     </modules>
 
     <properties>

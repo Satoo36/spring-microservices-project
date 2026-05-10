@@ -63,19 +63,34 @@ spring:
                 key-resolver: "#{@ipKeyResolver}"
 
         # ----------------------------------------------------------
-        # ROUTE TEMPLATE (commented — add more services here later)
+        # ROUTE: order-service (Phase 3)
         # ----------------------------------------------------------
-        # - id: order-service-route
-        #   uri: lb://order-service
-        #   predicates:
-        #     - Path=/api/orders/**
-        #   filters:
-        #     - name: RequestRateLimiter
-        #       args:
-        #         redis-rate-limiter.replenishRate: 5
-        #         redis-rate-limiter.burstCapacity: 10
-        #         redis-rate-limiter.requestedTokens: 1
-        #         key-resolver: "#{@ipKeyResolver}"
+        - id: order-service-route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
+
+        # ----------------------------------------------------------
+        # ROUTE: product-service (Phase 3)
+        # ----------------------------------------------------------
+        - id: product-service-route
+          uri: lb://product-service
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
 
 # ============================================================
 # EUREKA CLIENT

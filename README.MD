@@ -140,7 +140,7 @@ api-gateway/                        port 8080
 
 ---
 
-### Phase 3 — Inter-Service Communication (Sync)
+### Phase 3 — Inter-Service Communication (Sync) ✅ COMPLETED
 
 **Goal:** Services call each other synchronously using `OpenFeign` with load balancing.
 
@@ -150,17 +150,50 @@ api-gateway/                        port 8080
 - Service-to-service auth headers propagation
 
 **Steps:**
-1. Add `order-service` and `product-service` with basic CRUD
-2. In `order-service`, add a Feign client interface to call `product-service` (check stock)
-3. In `order-service`, add a Feign client to call `user-service` (validate user)
-4. Use Feign `RequestInterceptor` to forward the JWT token to downstream services
-5. Test: Create an order → gateway → order-service → product-service + user-service
+1. ✅ Add `order-service` and `product-service` with basic CRUD
+2. ✅ In `order-service`, add a Feign client interface to call `product-service` (check stock)
+3. ✅ In `order-service`, add a Feign client to call `user-service` (validate user)
+4. ✅ Use Feign `RequestInterceptor` to forward the JWT token to downstream services
+5. ✅ Test: Create an order → gateway → order-service → product-service + user-service
+
+**What was built:**
+```
+user-service/
+  model/User.java                   record (id, name, email)
+  controller/UserController.java    GET /api/users/{id}  ← called by order-service
+
+product-service/              port 8083
+  model/Product.java                (id, name, price, stock)
+  service/ProductService.java       in-memory store, thread-safe stock reduction
+  controller/ProductController.java GET /api/products/{id}
+                                    PUT /api/products/{id}/reduce-stock?quantity=N
+
+order-service/                port 8082
+  client/UserServiceClient.java     @FeignClient(name="user-service")
+  client/ProductServiceClient.java  @FeignClient(name="product-service")
+  client/dto/UserResponse.java      local DTO (Tolerant Reader pattern)
+  client/dto/ProductResponse.java   local DTO
+  interceptor/FeignClientInterceptor.java  RequestInterceptor — forwards JWT + X-Correlation-Id
+  service/OrderService.java         orchestrates: validate user → check stock → reduce stock → save
+  controller/OrderController.java   POST /api/orders, GET /api/orders/{id}
+```
+
+**Key implementation notes:**
+- `@EnableFeignClients` on `OrderServiceApplication` scans for `@FeignClient` interfaces
+- `@FeignClient(name="user-service")` name MUST match `spring.application.name` in target service
+- `FeignClientInterceptor` uses `RequestContextHolder` (ThreadLocal) to read current request — does NOT work in reactive/WebFlux
+- Local DTOs (UserResponse, ProductResponse) decouple services — Tolerant Reader pattern
+- `FeignException.NotFound` is thrown when downstream returns 404 — catch it explicitly
+- In-memory data: users `u1`/`u2`, products `p1`/`p2`/`p3` (p3 has only 5 stock for testing)
+- Start order: **Eureka → user-service → product-service → order-service** (gateway optional)
 
 **Key interview questions this covers:**
 - What is a Feign client?
 - How does load balancing work with Feign + Eureka?
 - How do you propagate security context (JWT) across service calls?
 - What are the drawbacks of synchronous inter-service communication?
+
+**Answers to interview questions are in:** `order-service/src/main/java/com/microservices/order/OrderServiceApplication.java`
 
 ---
 
