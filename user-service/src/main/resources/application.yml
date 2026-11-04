@@ -7,7 +7,7 @@ spring:
   config:
     # Modern Spring Boot 3.x way to pull config from Config Server.
     # "optional:" means: if Config Server is down, don't crash — use local defaults.
-    import: "optional:configserver:http://localhost:8888"
+    import: "optional:configserver:http://config-server:8888"
 
   profiles:
     # Change to "dev" to load user-service-dev.yml from config-repo
@@ -17,7 +17,7 @@ eureka:
   client:
     service-url:
       # The address of the Eureka server to register with
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://eureka-server:8761/eureka/
   instance:
     # Register using IP address instead of hostname (more reliable locally)
     prefer-ip-address: true

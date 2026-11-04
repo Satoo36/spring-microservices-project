@@ -7,7 +7,7 @@ spring:
 
 eureka:
   instance:
-    hostname: localhost
+    hostname: eureka-server
   client:
     # The Eureka server should NOT register itself as a client.
     # By default every Eureka-enabled app tries to register — we turn that off here

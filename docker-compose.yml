@@ -1,0 +1,67 @@
+
+services:
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  eureka-server:
+    image: eureka-server:1.0
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    restart: unless-stopped
+
+  config-server:
+    image: config-server:1.0
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./config-repo:/config-repo
+    environment:
+      SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS: file:/config-repo
+    restart: unless-stopped
+
+  user-service:
+    image: user-service:1.0
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  product-service:
+    image: product-service:1.0
+    container_name: product-service
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+
+  order-service:
+    image: order-service:1.0
+    container_name: order-service
+    ports:
+      - "8082:8082"
+    restart: unless-stopped
+
+  api-gateway:
+    image: api-gateway:1.0
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+
