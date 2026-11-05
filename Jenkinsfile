@@ -3,9 +3,7 @@ pipeline {
 
     environment {
         AWS_REGION = 'eu-north-1'
-        AWS_ACCOUNT_ID = '735726038284'
         ECR_REGISTRY = '735726038284.dkr.ecr.eu-north-1.amazonaws.com'
-        IMAGE_TAG = '1.${BUILD_NUMBER}'
     }
 
     stages {
@@ -41,6 +39,8 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 sh '''
+                    IMAGE_TAG="1.${BUILD_NUMBER}"
+
                     docker build -t user-service:${IMAGE_TAG} ./user-service
                     docker build -t product-service:${IMAGE_TAG} ./product-service
                     docker build -t order-service:${IMAGE_TAG} ./order-service
@@ -60,6 +60,8 @@ pipeline {
         stage('Tag Images') {
             steps {
                 sh '''
+                    IMAGE_TAG="1.${BUILD_NUMBER}"
+
                     for service in user-service product-service order-service; do
                         docker tag ${service}:${IMAGE_TAG} ${ECR_REGISTRY}/${service}:${IMAGE_TAG}
                     done
@@ -70,6 +72,8 @@ pipeline {
         stage('Push Images to ECR') {
             steps {
                 sh '''
+                    IMAGE_TAG="1.${BUILD_NUMBER}"
+
                     for service in user-service product-service order-service; do
                         docker push ${ECR_REGISTRY}/${service}:${IMAGE_TAG}
                     done
